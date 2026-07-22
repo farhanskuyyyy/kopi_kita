@@ -1,0 +1,23 @@
+import { chromium } from "playwright";
+const browser = await chromium.launch();
+const page = await browser.newPage();
+await page.goto("http://localhost:4173/admin/login", { waitUntil: "networkidle" });
+await page.fill("#username", "admin.catalog");
+await page.fill("#password", "Admin123!");
+await page.locator("button[type=submit]").click();
+await page.waitForURL("**/admin", { timeout: 6000 });
+await page.locator("a[href='/admin/categories']").first().click();
+await page.waitForURL("**/admin/categories");
+await page.waitForTimeout(700);
+
+const espressoRow = page.locator("tr", { hasText: "Espresso" });
+console.log("row count:", await espressoRow.count());
+const delBtn = espressoRow.locator("button:has-text('Delete')").first();
+console.log("delete btn count:", await delBtn.count());
+console.log("delete btn disabled?", await delBtn.isDisabled());
+await delBtn.click();
+await page.waitForTimeout(1000);
+console.log("--- body after delete click ---");
+console.log(await page.locator("body").innerText());
+await page.screenshot({path:".qa-scratch/catguard-debug.png", fullPage:true});
+await browser.close();

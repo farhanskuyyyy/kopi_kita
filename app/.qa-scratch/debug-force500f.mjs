@@ -1,0 +1,16 @@
+import { chromium } from "playwright";
+const browser = await chromium.launch();
+const page = await browser.newPage();
+page.on("console", (msg)=>{ if(msg.type()==='error') console.log('[err]', msg.text());});
+page.on("pageerror", (e)=>console.log('[pageerror]', e.message));
+await page.goto("http://localhost:4173/menu", { waitUntil: "networkidle" });
+await page.waitForTimeout(500);
+await page.evaluate(() => window.__mockScenarios.forceServerError(true));
+const espressoLink = page.locator("a[href='/menu/espresso']").first();
+await espressoLink.click();
+await page.waitForTimeout(2000);
+await page.screenshot({path:".qa-scratch/force500-menu.png", fullPage:true});
+console.log("--- full body html snippet ---");
+const html = await page.locator("main").innerHTML().catch(async()=>await page.locator("body").innerHTML());
+console.log(html.slice(0, 3000));
+await browser.close();

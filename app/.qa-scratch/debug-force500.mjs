@@ -1,0 +1,13 @@
+import { chromium } from "playwright";
+const browser = await chromium.launch();
+const page = await browser.newPage();
+page.on("console", (msg) => { if (/MSW/.test(msg.text())===false && msg.type()==='error') console.log('[err]', msg.text()); });
+await page.goto("http://localhost:4173/", { waitUntil: "networkidle" });
+await page.evaluate(() => window.__mockScenarios.forceServerError(true));
+const state = await page.evaluate(() => window.__mockScenarios.getState());
+console.log("state after forceServerError(true):", JSON.stringify(state));
+await page.goto("http://localhost:4173/menu", { waitUntil: "networkidle" });
+await page.waitForTimeout(1000);
+console.log("--- menu body with forced 500 ---");
+console.log(await page.locator("body").innerText());
+await browser.close();

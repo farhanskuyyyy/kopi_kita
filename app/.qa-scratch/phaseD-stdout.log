@@ -1,0 +1,90 @@
+{
+  "gating": [
+    {
+      "name": "Unauth-Redirect /admin",
+      "status": "PASS",
+      "notes": "landed on http://localhost:4173/admin/login?returnTo=%2Fadmin"
+    },
+    {
+      "name": "Unauth-Redirect /admin/products",
+      "status": "PASS",
+      "notes": "landed on http://localhost:4173/admin/login?returnTo=%2Fadmin%2Fproducts"
+    },
+    {
+      "name": "Unauth-Redirect /admin/products/new",
+      "status": "PASS",
+      "notes": "landed on http://localhost:4173/admin/login?returnTo=%2Fadmin%2Fproducts%2Fnew"
+    },
+    {
+      "name": "Unauth-Redirect /admin/products/prod_latte/edit",
+      "status": "PASS",
+      "notes": "landed on http://localhost:4173/admin/login?returnTo=%2Fadmin%2Fproducts%2Fprod_latte%2Fedit"
+    },
+    {
+      "name": "Unauth-Redirect /admin/categories",
+      "status": "PASS",
+      "notes": "landed on http://localhost:4173/admin/login?returnTo=%2Fadmin%2Fcategories"
+    },
+    {
+      "name": "Unauth-Redirect /admin/categories/new",
+      "status": "PASS",
+      "notes": "landed on http://localhost:4173/admin/login?returnTo=%2Fadmin%2Fcategories%2Fnew"
+    },
+    {
+      "name": "Unauth-Redirect /admin/categories/cat_espresso/edit",
+      "status": "PASS",
+      "notes": "landed on http://localhost:4173/admin/login?returnTo=%2Fadmin%2Fcategories%2Fcat_espresso%2Fedit"
+    },
+    {
+      "name": "Unauth-Redirect /admin/orders",
+      "status": "PASS",
+      "notes": "landed on http://localhost:4173/admin/login?returnTo=%2Fadmin%2Forders"
+    },
+    {
+      "name": "Unauth-Redirect /admin/orders/order_1",
+      "status": "PASS",
+      "notes": "landed on http://localhost:4173/admin/login?returnTo=%2Fadmin%2Forders%2Forder_1"
+    },
+    {
+      "name": "FulfillmentStaff-Blocked-From /admin/products",
+      "status": "PASS",
+      "notes": "landed on http://localhost:4173/admin"
+    },
+    {
+      "name": "FulfillmentStaff-Blocked-From /admin/products/new",
+      "status": "PASS",
+      "notes": "landed on http://localhost:4173/admin"
+    },
+    {
+      "name": "FulfillmentStaff-Blocked-From /admin/categories",
+      "status": "PASS",
+      "notes": "landed on http://localhost:4173/admin"
+    },
+    {
+      "name": "CatalogAdmin-Blocked-From /admin/orders",
+      "status": "PASS",
+      "notes": "landed on http://localhost:4173/admin"
+    },
+    {
+      "name": "CatalogAdmin-Blocked-From /admin/orders/order_1",
+      "status": "PASS",
+      "notes": "landed on http://localhost:4173/admin"
+    },
+    {
+      "name": "Unauth-Customer-Redirect /account",
+      "status": "PASS",
+      "notes": "landed on http://localhost:4173/login?returnTo=%2Faccount"
+    },
+    {
+      "name": "Unauth-Customer-Redirect /account/orders",
+      "status": "PASS",
+      "notes": "landed on http://localhost:4173/login?returnTo=%2Faccount%2Forders"
+    },
+    {
+      "name": "Unauth-Customer-Redirect /account/favorites",
+      "status": "PASS",
+      "notes": "landed on http://localhost:4173/login?returnTo=%2Faccount%2Ffavorites"
+    }
+  ],
+  "defects": []
+}

@@ -1,0 +1,109 @@
+{
+  "responsive": [
+    {
+      "name": "Home-mobile",
+      "status": "PASS",
+      "notes": "viewport=375x812; docScrollWidth=375; hasHorizontalOverflow=false"
+    },
+    {
+      "name": "Home-desktop",
+      "status": "PASS",
+      "notes": "viewport=1440x900; docScrollWidth=1440; hasHorizontalOverflow=false"
+    },
+    {
+      "name": "Menu-mobile",
+      "status": "PASS",
+      "notes": "viewport=375x812; docScrollWidth=375; hasHorizontalOverflow=false"
+    },
+    {
+      "name": "Menu-desktop",
+      "status": "PASS",
+      "notes": "viewport=1440x900; docScrollWidth=1440; hasHorizontalOverflow=false"
+    },
+    {
+      "name": "ProductDetail-mobile",
+      "status": "PASS",
+      "notes": "viewport=375x812; docScrollWidth=375; hasHorizontalOverflow=false"
+    },
+    {
+      "name": "ProductDetail-desktop",
+      "status": "PASS",
+      "notes": "viewport=1440x900; docScrollWidth=1440; hasHorizontalOverflow=false"
+    },
+    {
+      "name": "Cart-mobile",
+      "status": "PASS",
+      "notes": "viewport=375x812; docScrollWidth=375; hasHorizontalOverflow=false"
+    },
+    {
+      "name": "Cart-desktop",
+      "status": "PASS",
+      "notes": "viewport=1440x900; docScrollWidth=1440; hasHorizontalOverflow=false"
+    },
+    {
+      "name": "Login-mobile",
+      "status": "PASS",
+      "notes": "viewport=375x812; docScrollWidth=375; hasHorizontalOverflow=false"
+    },
+    {
+      "name": "Login-desktop",
+      "status": "PASS",
+      "notes": "viewport=1440x900; docScrollWidth=1440; hasHorizontalOverflow=false"
+    },
+    {
+      "name": "AdminLogin-mobile",
+      "status": "PASS",
+      "notes": "viewport=375x812; docScrollWidth=375; hasHorizontalOverflow=false"
+    },
+    {
+      "name": "AdminLogin-desktop",
+      "status": "PASS",
+      "notes": "viewport=1440x900; docScrollWidth=1440; hasHorizontalOverflow=false"
+    }
+  ],
+  "a11y": [
+    {
+      "page": "Home",
+      "critical": 0,
+      "serious": 0,
+      "details": "none"
+    },
+    {
+      "page": "Menu",
+      "critical": 1,
+      "serious": 0,
+      "details": "critical:button-name(1 nodes)"
+    },
+    {
+      "page": "ProductDetail",
+      "critical": 0,
+      "serious": 0,
+      "details": "none"
+    },
+    {
+      "page": "Cart",
+      "critical": 0,
+      "serious": 0,
+      "details": "none"
+    },
+    {
+      "page": "Login",
+      "critical": 0,
+      "serious": 0,
+      "details": "none"
+    },
+    {
+      "page": "AdminLogin",
+      "critical": 0,
+      "serious": 0,
+      "details": "none"
+    }
+  ],
+  "defects": [
+    {
+      "screen": "a11y:Menu",
+      "severity": "high",
+      "notes": "1 critical axe violations"
+    }
+  ]
+}

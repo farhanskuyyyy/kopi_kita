@@ -1,0 +1,101 @@
+{
+  "results": {
+    "screens": [
+      {
+        "screen": "11-Login",
+        "status": "PASS",
+        "notes": "login succeeded, redirected to /account"
+      },
+      {
+        "screen": "13-AccountHome",
+        "status": "PASS",
+        "notes": "snippet=Skip to content Kopi Kita Espresso Brewed Coffee Non-Coffee Tea Pastries Breakfast Merchandise Profile Order History Favorites My Account Log out  Sari Amelia  sari@example.com  +6281234567890  Member"
+      },
+      {
+        "screen": "14-OrderHistory",
+        "status": "PASS",
+        "notes": "snippet=Skip to content Kopi Kita Espresso Brewed Coffee Non-Coffee Tea Pastries Breakfast Merchandise Profile Order History Favorites Order History All Order\tDate\tStatus\tTotal\tItems\tActions #order_2\t22 Jul 2026 14:20\tPreparing\tRp 81.000\t3\tTrackReorder  © 20"
+      },
+      {
+        "screen": "15-Favorites",
+        "status": "FAIL",
+        "notes": "url=http://localhost:4173/login?returnTo=%2Faccount%2Ffavorites; snippet=Kopi Kita Log in  Welcome back to Kopi Kita.  Email* Password* Remember me Log in  Don't have an account? Register  Session expired, please log in again."
+      },
+      {
+        "screen": "12-Register",
+        "status": "PASS",
+        "notes": "registration succeeded, redirected to /account"
+      }
+    ],
+    "flows": [
+      {
+        "name": "Login-Wrong-Credentials",
+        "status": "PASS",
+        "notes": "Kopi Kita Log in  Welcome back to Kopi Kita.  Email* Password* Remember me  Incorrect email or password.  Log in  Don't have an account? Register"
+      },
+      {
+        "name": "Login-AlreadyAuthed-Redirect",
+        "status": "FAIL",
+        "notes": "url=http://localhost:4173/login?returnTo=%2Faccount"
+      },
+      {
+        "name": "DEFECT-Account-Reload-Session-Loss",
+        "status": "FAIL",
+        "notes": "tokenBefore=present; urlAfter=http://localhost:4173/login?returnTo=%2Faccount; tokenAfter=null; bodySnippet=Kopi Kita Log in  Welcome back to Kopi Kita.  Email* Password* Remember me Log in  Don't have an account? Register  Session expired, please log in aga"
+      },
+      {
+        "name": "Reorder-Flow",
+        "status": "PASS",
+        "notes": "redirected to http://localhost:4173/cart; snippet=Skip to content Kopi Kita 3 Espresso Brewed Coffee Non-Coffee Tea Pastries Breakfast Merchandise Your Cart  Caffe Latte  Rp 33.000 each  1  Rp 33.000  Remove  Blueberry Muffin  Rp 24.000 each  2  Rp 4"
+      },
+      {
+        "name": "Logout",
+        "status": "FAIL",
+        "notes": "locator.click: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('button:has-text(\\'Logout\\'), button:has-text(\\'Log out\\')').first()\u001b[22m\n"
+      },
+      {
+        "name": "Account-Route-Gating-LoggedOut",
+        "status": "PASS",
+        "notes": "url=http://localhost:4173/login?returnTo=%2Faccount"
+      },
+      {
+        "name": "Empty-Favorites-State",
+        "status": "PASS",
+        "notes": "Skip to content Kopi Kita Espresso Brewed Coffee Non-Coffee Tea Pastries Breakfast Merchandise Profile Order History Favorites  No favorites yet  Save products for quick reorder.  Browse menu  © 2026 "
+      },
+      {
+        "name": "Register-Duplicate-Email",
+        "status": "PASS",
+        "notes": "Kopi Kita Create an account  Join Kopi Kita to track orders and save favorites.  Name* Email*  An account with this email already exists.  Password* Confirm password* Create account  Already have an a"
+      },
+      {
+        "name": "Register-Password-Mismatch",
+        "status": "PASS",
+        "notes": "Kopi Kita Create an account  Join Kopi Kita to track orders and save favorites.  Name* Email* Password* Confirm password*  Passwords do not match.  Create account  Already have an account? Log in"
+      }
+    ],
+    "defects": [
+      {
+        "screen": "Login-AlreadyAuthed-Redirect",
+        "severity": "high",
+        "notes": "url=http://localhost:4173/login?returnTo=%2Faccount"
+      },
+      {
+        "screen": "DEFECT-Account-Reload-Session-Loss",
+        "severity": "high",
+        "notes": "tokenBefore=present; urlAfter=http://localhost:4173/login?returnTo=%2Faccount; tokenAfter=null; bodySnippet=Kopi Kita Log in  Welcome back to Kopi Kita.  Email* Password* Remember me Log in  Don't have an account? Register  Session expired, please log in aga"
+      },
+      {
+        "screen": "15-Favorites",
+        "severity": "high",
+        "notes": "url=http://localhost:4173/login?returnTo=%2Faccount%2Ffavorites; snippet=Kopi Kita Log in  Welcome back to Kopi Kita.  Email* Password* Remember me Log in  Don't have an account? Register  Session expired, please log in again."
+      },
+      {
+        "screen": "Logout",
+        "severity": "high",
+        "notes": "locator.click: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('button:has-text(\\'Logout\\'), button:has-text(\\'Log out\\')').first()\u001b[22m\n"
+      }
+    ]
+  },
+  "consoleErrorCount": 8
+}

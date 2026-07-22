@@ -1,0 +1,28 @@
+import { chromium } from "playwright";
+const browser = await chromium.launch();
+const page = await browser.newPage();
+page.on("console", (msg) => console.log(`[console.${msg.type()}]`, msg.text()));
+page.on("pageerror", (e) => console.log("[pageerror]", e.message, e.stack));
+page.on("requestfailed", (r) => console.log("[requestfailed]", r.url(), r.failure()?.errorText));
+
+await page.goto("http://localhost:4173/product/prod_latte", { waitUntil: "networkidle" });
+await page.getByText("Small", { exact: true }).click();
+await page.getByText("Regular Milk", { exact: true }).click();
+await page.locator("button:has-text('Add to Cart')").click();
+await page.waitForTimeout(400);
+await page.goto("http://localhost:4173/cart", { waitUntil: "networkidle" });
+await page.locator("button:has-text('Proceed to Checkout')").click();
+await page.waitForURL("**/checkout/details");
+await page.fill("#fullName", "QA Tester");
+await page.fill("#email", "qa@example.com");
+await page.fill("#phone", "081234567890");
+await page.locator("button:has-text('Continue to Payment')").click();
+await page.waitForURL("**/checkout/payment");
+console.log("waited for URL, now waiting 3s more...");
+await page.waitForTimeout(3000);
+console.log("--- payment page body after wait ---");
+console.log(await page.locator("body").innerText());
+await page.screenshot({path:".qa-scratch/payment-blank.png", fullPage:true});
+const html = await page.content();
+require('fs').writeFileSync('.qa-scratch/payment-blank.html', html);
+await browser.close();

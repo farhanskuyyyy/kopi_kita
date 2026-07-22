@@ -1,0 +1,1986 @@
+# metadata:
+#   artifact: API Contract
+#   version: 1.0
+#   owner: software-architect
+#   status: draft
+#
+# Project: ecatalog-coffeeshop
+# Workflow: clickable-frontend — Stage 4: API Contract Design
+# Prepared by: Software Architect Agent (sw-architect-ecatalog-coffe-clickable-fe)
+# Upstream inputs: Frontend-Specification.md (28 screens), Frontend-Architecture.md v1.1
+#   (adapter chain: Page -> React Query hook -> features/*/api adapter (Zod parse) ->
+#   lib/api/httpClient -> MSW handler -> mocks/data/db.ts), Feature-List.md (47 features).
+#
+# This is the single source of truth the frontend Zod adapters type against and the
+# Stage 5 Mock Backend Engineer implements 1:1 in MSW. Contract only — no business logic,
+# no implementation. Money is always an integer IDR minor-unit-free amount (no floats,
+# no decimals — Rupiah has no subunit in practice here), per Frontend-Architecture §7
+# (lib/format/currency.ts formatIDR).
+
+openapi: 3.1.0
+
+info:
+  title: Coffeeshop E-Catalog API
+  version: "1.0.0"
+  description: >
+    Backend API contract for the ecatalog-coffeeshop clickable-frontend demo.
+    Implemented by Stage 5 (Mock Backend Engineer) as MSW handlers over an in-memory
+    store (mocks/data/db.ts). Every endpoint returns the standard response envelope
+    (STACK-STANDARDS.md: success flag, data, error, request timing). All monetary
+    amounts are non-negative integers denominated in IDR (e.g. 45000 = Rp 45.000).
+  contact:
+    name: software-architect-ecatalog-coffe-clickable-fe
+
+servers:
+  - url: /api/v1
+    description: Mocked backend (MSW), same-origin relative base path used by lib/api/httpClient
+
+tags:
+  - name: auth
+    description: Customer and staff authentication (two independent session domains, spec §3.1)
+  - name: catalog
+    description: Public product and category browsing/search
+  - name: cart
+    description: Server-side cart support — stock re-check, promo validation
+  - name: checkout
+    description: Payment method validation and order placement
+  - name: orders
+    description: Order retrieval / tracking (public, bookmarkable)
+  - name: account
+    description: Registered-customer profile, order history, favorites
+  - name: store-info
+    description: Static/mocked store info
+  - name: admin-dashboard
+    description: Staff dashboard counts (Catalog Admin + Fulfillment Staff)
+  - name: admin-catalog
+    description: Catalog Admin product & category CRUD
+  - name: admin-fulfillment
+    description: Fulfillment Staff order queue & status control
+
+# ---------------------------------------------------------------------------
+# Security
+# ---------------------------------------------------------------------------
+security: []
+
+# ---------------------------------------------------------------------------
+# Paths
+# ---------------------------------------------------------------------------
+paths:
+
+  # ===== AUTH ================================================================
+  /auth/customer/register:
+    post:
+      tags: [auth]
+      summary: Register a new customer account (F-018, Screen 12)
+      operationId: registerCustomer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CustomerRegisterRequest' }
+            examples:
+              default:
+                value: { name: "Sari Amelia", email: "sari@example.com", password: "Passw0rd!", confirmPassword: "Passw0rd!" }
+      responses:
+        '201':
+          description: Account created and auto-logged-in
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [user, sessionToken]
+                        properties:
+                          user: { $ref: '#/components/schemas/User' }
+                          sessionToken: { type: string }
+        '409':
+          $ref: '#/components/responses/EmailExistsConflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /auth/customer/login:
+    post:
+      tags: [auth]
+      summary: Registered-customer login (F-019, Screen 11)
+      operationId: loginCustomer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CustomerLoginRequest' }
+      responses:
+        '200':
+          description: Authenticated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [user, sessionToken]
+                        properties:
+                          user: { $ref: '#/components/schemas/User' }
+                          sessionToken: { type: string }
+        '401':
+          $ref: '#/components/responses/InvalidCredentials'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /auth/staff/login:
+    post:
+      tags: [auth]
+      summary: Shared staff login — Catalog Admin & Fulfillment Staff (F-029, D7, Screen 17)
+      operationId: loginStaff
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/StaffLoginRequest' }
+      responses:
+        '200':
+          description: Authenticated; role in response drives client-side redirect/gating (D7)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [staffUser, sessionToken]
+                        properties:
+                          staffUser: { $ref: '#/components/schemas/StaffUser' }
+                          sessionToken: { type: string }
+        '401':
+          $ref: '#/components/responses/InvalidCredentials'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /auth/me:
+    get:
+      tags: [auth]
+      summary: Resolve the current session for a given identity domain (spec §3.1, §3.2)
+      operationId: getCurrentSession
+      security:
+        - customerSessionCookie: []
+        - staffSessionCookie: []
+      parameters:
+        - name: domain
+          in: query
+          required: true
+          schema: { type: string, enum: [customer, staff] }
+          description: Which of the two independent session domains to resolve
+      responses:
+        '200':
+          description: Session is valid
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [domain]
+                        properties:
+                          domain: { type: string, enum: [customer, staff] }
+                          user: { $ref: '#/components/schemas/User' }
+                          staffUser: { $ref: '#/components/schemas/StaffUser' }
+        '401':
+          description: No session / session expired for the requested domain
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+              examples:
+                expired:
+                  value:
+                    success: false
+                    data: null
+                    error: { code: "SESSION_EXPIRED", message: "Session expired, please log in again." }
+                    meta: { requestId: "req_1", timestamp: "2026-07-22T03:00:00Z", durationMs: 4 }
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /auth/logout:
+    post:
+      tags: [auth]
+      summary: End the current session for a given identity domain (Screen 13, F-045)
+      operationId: logout
+      security:
+        - customerSessionCookie: []
+        - staffSessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [domain]
+              properties:
+                domain: { type: string, enum: [customer, staff] }
+      responses:
+        '200':
+          description: Session cleared
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          loggedOut: { type: boolean, const: true }
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  # ===== CATALOG (public) =====================================================
+  /categories:
+    get:
+      tags: [catalog]
+      summary: List categories (Home shortcuts, Menu nav, Checkout — none; Screen 1, 2)
+      operationId: listCategories
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items: { $ref: '#/components/schemas/Category' }
+              examples:
+                default:
+                  value:
+                    success: true
+                    data:
+                      items:
+                        - { id: "cat_1", name: "Coffee", slug: "coffee", productCount: 12 }
+                        - { id: "cat_2", name: "Non-Coffee", slug: "non-coffee", productCount: 6 }
+                    error: null
+                    meta: { requestId: "req_2", timestamp: "2026-07-22T03:00:00Z", durationMs: 8 }
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /categories/{categorySlug}:
+    get:
+      tags: [catalog]
+      summary: Resolve a category by slug — used to validate /menu/:categorySlug (F-047, Screen 2)
+      operationId: getCategoryBySlug
+      parameters:
+        - $ref: '#/components/parameters/CategorySlugParam'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/Category' }
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /products:
+    get:
+      tags: [catalog]
+      summary: List/search products — Home, Catalog/Menu, Search Results (F-001, F-003, F-004, F-005; Screens 1, 2, 3)
+      operationId: listProducts
+      parameters:
+        - name: category
+          in: query
+          schema: { type: string }
+          description: Category slug filter (Menu)
+        - name: q
+          in: query
+          schema: { type: string }
+          description: Keyword search across name/description (Search Results, F-003)
+        - name: price_min
+          in: query
+          schema: { type: integer, minimum: 0 }
+        - name: price_max
+          in: query
+          schema: { type: integer, minimum: 0 }
+        - name: tags
+          in: query
+          style: form
+          explode: true
+          schema: { type: array, items: { type: string } }
+          description: e.g. tags=featured for Home's featured section
+        - name: availability
+          in: query
+          schema: { type: string, enum: [in_stock_only, all], default: all }
+        - name: sort
+          in: query
+          schema: { type: string, enum: [price_asc, price_desc, popularity], default: popularity }
+          description: Invalid value falls back to popularity per spec Screen 2
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: >
+            OK. If price_min > price_max the API resets both filters server-side and echoes
+            `meta.filterNotice` so the frontend can surface the inline note (spec Screen 2).
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items: { $ref: '#/components/schemas/Product' }
+                          pagination: { $ref: '#/components/schemas/PaginationMeta' }
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /products/{productId}:
+    get:
+      tags: [catalog]
+      summary: Product detail — customization groups, availability, live price basis (F-002, F-006, F-027; Screen 4)
+      operationId: getProduct
+      parameters:
+        - $ref: '#/components/parameters/ProductIdParam'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/ProductDetail' }
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  # ===== CART (server-side support) ==========================================
+  /cart/validate:
+    post:
+      tags: [cart]
+      summary: Stock re-check + price recompute for current cart lines (Cart hydrate, Review re-check; F-025, Screens 5, 8)
+      operationId: validateCart
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [lines]
+              properties:
+                lines:
+                  type: array
+                  items: { $ref: '#/components/schemas/CartLineInput' }
+      responses:
+        '200':
+          description: >
+            Always 200 even when some lines are unavailable — unavailability is data,
+            not a request error; the frontend flags lines and blocks checkout per F-025.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [lines, allAvailable, subtotal]
+                        properties:
+                          lines:
+                            type: array
+                            items: { $ref: '#/components/schemas/CartLineValidated' }
+                          allAvailable: { type: boolean }
+                          subtotal: { type: integer, minimum: 0 }
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /promo/validate:
+    post:
+      tags: [cart]
+      summary: Validate/apply a promo code against a mocked valid-code list (D8, F-026; Screen 5)
+      operationId: validatePromo
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PromoValidateRequest' }
+      responses:
+        '200':
+          description: >
+            Always 200 — an invalid/expired code is a valid business result (valid:false),
+            not a request error, per F-026 ("does not block checkout").
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/PromoValidateResult' }
+              examples:
+                valid:
+                  value:
+                    success: true
+                    data: { valid: true, code: "COFFEE10", type: "percent", value: 10, discountAmount: 4500, message: null }
+                    error: null
+                    meta: { requestId: "req_3", timestamp: "2026-07-22T03:00:00Z", durationMs: 5 }
+                invalid:
+                  value:
+                    success: true
+                    data: { valid: false, code: "BADCODE", type: null, value: null, discountAmount: 0, message: "This promo code is not valid or has expired." }
+                    error: null
+                    meta: { requestId: "req_4", timestamp: "2026-07-22T03:00:00Z", durationMs: 5 }
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  # ===== CHECKOUT / ORDERS (public/customer) =================================
+  /checkout/payment/validate:
+    post:
+      tags: [checkout]
+      summary: >
+        Validate the selected mocked payment method (F-013, Screen 7). Selecting the
+        deliberately-triggerable failure option (paymentMethod = "demo_declined_card")
+        returns 402 so Continue does not advance to Review.
+      operationId: validatePaymentMethod
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [paymentMethod]
+              properties:
+                paymentMethod: { $ref: '#/components/schemas/PaymentMethod' }
+      responses:
+        '200':
+          description: Payment method accepted (demo — no real charge occurs)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          valid: { type: boolean, const: true }
+        '402':
+          description: Mocked payment failure (deliberately-triggerable demo path)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+              examples:
+                default:
+                  value:
+                    success: false
+                    data: null
+                    error: { code: "PAYMENT_FAILED", message: "Demo payment declined — no real charge occurred. Please try another method.", details: null, fieldErrors: null }
+                    meta: { requestId: "req_5", timestamp: "2026-07-22T03:00:00Z", durationMs: 6 }
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /orders:
+    post:
+      tags: [checkout]
+      summary: Place order — guest or registered (F-011–F-015, Screen 8)
+      operationId: createOrder
+      security:
+        - customerSessionCookie: []
+        - {}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OrderCreateRequest' }
+      responses:
+        '201':
+          description: Order placed; cart is cleared client-side on success (F-015)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/Order' }
+        '409':
+          description: One or more lines became unavailable during final stock re-check (F-025)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+              examples:
+                default:
+                  value:
+                    success: false
+                    data: null
+                    error:
+                      code: "STOCK_UNAVAILABLE"
+                      message: "Some items in your cart are no longer available."
+                      details: { unavailableLines: [{ productId: "prod_9", name: "Seasonal Latte" }] }
+                      fieldErrors: null
+                    meta: { requestId: "req_6", timestamp: "2026-07-22T03:00:00Z", durationMs: 12 }
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /orders/{orderId}:
+    get:
+      tags: [orders]
+      summary: Get order by ID — Order Confirmation & Order Tracking (F-016, F-017; Screens 9, 10)
+      operationId: getOrder
+      parameters:
+        - $ref: '#/components/parameters/OrderIdParam'
+      responses:
+        '200':
+          description: >
+            OK. Order Tracking polls this endpoint (refetchInterval, Frontend-Architecture §2.2)
+            to reflect timer/staff-driven status changes near-immediately (§3.11).
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/Order' }
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  # ===== ACCOUNT (registered customer) ========================================
+  /account/profile:
+    get:
+      tags: [account]
+      summary: Registered-customer profile (Account Home, Checkout Details pre-fill; Screens 6, 13)
+      operationId: getProfile
+      security: [{ customerSessionCookie: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/User' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    put:
+      tags: [account]
+      summary: Update profile (inline edit — name/phone; Screen 13)
+      operationId: updateProfile
+      security: [{ customerSessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProfileUpdateRequest' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/User' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /account/orders:
+    get:
+      tags: [account]
+      summary: Order history (F-020; Screen 14)
+      operationId: listMyOrders
+      security: [{ customerSessionCookie: [] }]
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [all, active, completed], default: all }
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items: { $ref: '#/components/schemas/OrderSummary' }
+                          pagination: { $ref: '#/components/schemas/PaginationMeta' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /account/orders/{orderId}/reorder:
+    post:
+      tags: [account]
+      summary: Reorder — adds available items to current cart, flags unavailable ones (F-021, A4; Screen 14)
+      operationId: reorder
+      security: [{ customerSessionCookie: [] }]
+      parameters:
+        - $ref: '#/components/parameters/OrderIdParam'
+      responses:
+        '200':
+          description: >
+            Always 200 — even if every item is now unavailable, the notice still explains why
+            (A4), never a silent no-op.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/ReorderResult' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /account/favorites:
+    get:
+      tags: [account]
+      summary: List favorites (F-022; Screen 15)
+      operationId: listFavorites
+      security: [{ customerSessionCookie: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items: { $ref: '#/components/schemas/Product' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    post:
+      tags: [account]
+      summary: Add a favorite (F-022; Screens 4, 15)
+      operationId: addFavorite
+      security: [{ customerSessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [productId]
+              properties:
+                productId: { type: string }
+      responses:
+        '201':
+          description: Added
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/Product' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /account/favorites/{productId}:
+    delete:
+      tags: [account]
+      summary: Remove a favorite (immediate, no confirmation; Screen 15)
+      operationId: removeFavorite
+      security: [{ customerSessionCookie: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ProductIdParam'
+      responses:
+        '200':
+          description: Removed
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          removed: { type: boolean, const: true }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  # ===== STORE INFO ============================================================
+  /store-info:
+    get:
+      tags: [store-info]
+      summary: Hours, location, contact (F-023; Screen 16)
+      operationId: getStoreInfo
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/StoreInfo' }
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  # ===== ADMIN DASHBOARD ========================================================
+  /admin/dashboard/counts/products:
+    get:
+      tags: [admin-dashboard]
+      summary: Product count tile (F-030; Screen 18). Split per-tile so one failing tile doesn't block others.
+      operationId: getProductCount
+      security: [{ staffSessionCookie: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/CountData' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /admin/dashboard/counts/categories:
+    get:
+      tags: [admin-dashboard]
+      summary: Category count tile (F-030; Screen 18)
+      operationId: getCategoryCount
+      security: [{ staffSessionCookie: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/CountData' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /admin/dashboard/counts/orders:
+    get:
+      tags: [admin-dashboard]
+      summary: Open/incoming order count tile (F-030; Screen 18)
+      operationId: getOpenOrderCount
+      security: [{ staffSessionCookie: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/CountData' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  # ===== ADMIN CATALOG — Products (Catalog Admin) ==============================
+  /admin/products:
+    get:
+      tags: [admin-catalog]
+      summary: Admin product list — search/filter, show-deleted toggle (F-031; Screen 19)
+      operationId: adminListProducts
+      security: [{ staffSessionCookie: [] }]
+      parameters:
+        - name: search
+          in: query
+          schema: { type: string }
+          description: Name match
+        - name: category
+          in: query
+          schema: { type: string }
+        - name: availability
+          in: query
+          schema: { type: string, enum: [in_stock, out_of_stock, all], default: all }
+        - name: includeDeleted
+          in: query
+          schema: { type: boolean, default: false }
+          description: Default off (§3.13) — "show deleted" toggle
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items: { $ref: '#/components/schemas/Product' }
+                          pagination: { $ref: '#/components/schemas/PaginationMeta' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    post:
+      tags: [admin-catalog]
+      summary: Create product (F-032; Screen 20)
+      operationId: adminCreateProduct
+      security: [{ staffSessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProductCreateRequest' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/ProductDetail' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Referenced categoryId no longer exists (stale-category race, Screen 20 Exceptions)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /admin/products/{productId}:
+    get:
+      tags: [admin-catalog]
+      summary: Fetch existing product for edit (Screen 21)
+      operationId: adminGetProduct
+      security: [{ staffSessionCookie: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ProductIdParam'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/ProductDetail' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    put:
+      tags: [admin-catalog]
+      summary: Update product (F-033; Screen 21)
+      operationId: adminUpdateProduct
+      security: [{ staffSessionCookie: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ProductIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProductUpdateRequest' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/ProductDetail' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Product was concurrently soft-deleted by another session (Screen 21 Exceptions, A12)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+              examples:
+                default:
+                  value:
+                    success: false
+                    data: null
+                    error: { code: "PRODUCT_DELETED", message: "This product was deleted.", details: null, fieldErrors: null }
+                    meta: { requestId: "req_7", timestamp: "2026-07-22T03:00:00Z", durationMs: 5 }
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    delete:
+      tags: [admin-catalog]
+      summary: Soft-delete product (D2, F-034; Screens 19, 21)
+      operationId: adminDeleteProduct
+      security: [{ staffSessionCookie: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ProductIdParam'
+      responses:
+        '200':
+          description: Soft-deleted — remains referenceable from historical orders (D2)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/ProductDetail' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /admin/products/{productId}/restore:
+    post:
+      tags: [admin-catalog]
+      summary: Restore a soft-deleted product (A12; Screen 21 light-touch affordance)
+      operationId: adminRestoreProduct
+      security: [{ staffSessionCookie: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ProductIdParam'
+      responses:
+        '200':
+          description: Restored
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/ProductDetail' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /admin/products/{productId}/availability:
+    patch:
+      tags: [admin-catalog]
+      summary: Toggle availability — immediately reflected on customer catalog (F-035; Screen 19)
+      operationId: adminToggleAvailability
+      security: [{ staffSessionCookie: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ProductIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [available]
+              properties:
+                available: { type: boolean }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/ProductDetail' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  # ===== ADMIN CATALOG — Categories (Catalog Admin) =============================
+  /admin/categories:
+    get:
+      tags: [admin-catalog]
+      summary: Admin category list with product counts (F-036; Screen 22)
+      operationId: adminListCategories
+      security: [{ staffSessionCookie: [] }]
+      parameters:
+        - name: search
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items: { $ref: '#/components/schemas/Category' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    post:
+      tags: [admin-catalog]
+      summary: Create category (F-037; Screen 23)
+      operationId: adminCreateCategory
+      security: [{ staffSessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CategoryCreateRequest' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/Category' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/CategoryNameConflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /admin/categories/{categoryId}:
+    get:
+      tags: [admin-catalog]
+      summary: Fetch existing category for edit (Screen 24)
+      operationId: adminGetCategory
+      security: [{ staffSessionCookie: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CategoryIdParam'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/Category' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    put:
+      tags: [admin-catalog]
+      summary: Rename category — propagates everywhere referenced (F-038; Screen 24)
+      operationId: adminUpdateCategory
+      security: [{ staffSessionCookie: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CategoryIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CategoryUpdateRequest' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/Category' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/CategoryNameConflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    delete:
+      tags: [admin-catalog]
+      summary: >
+        Delete category — hard-guarded while any product is still assigned (D1, A1, F-039;
+        Screens 22, 24). No cascade, no force-delete.
+      operationId: adminDeleteCategory
+      security: [{ staffSessionCookie: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CategoryIdParam'
+      responses:
+        '200':
+          description: Deleted (only reachable when assignedProductCount is 0)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          deleted: { type: boolean, const: true }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/CategoryHasProductsConflict'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  # ===== ADMIN FULFILLMENT — Orders (Fulfillment Staff) =========================
+  /admin/orders:
+    get:
+      tags: [admin-fulfillment]
+      summary: Incoming orders queue (F-041; Screen 25)
+      operationId: adminListOrders
+      security: [{ staffSessionCookie: [] }]
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [all, received, preparing, ready, completed], default: all }
+        - name: sort
+          in: query
+          schema: { type: string, enum: [newest, oldest], default: newest }
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items: { $ref: '#/components/schemas/OrderSummary' }
+                          pagination: { $ref: '#/components/schemas/PaginationMeta' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /admin/orders/{orderId}:
+    get:
+      tags: [admin-fulfillment]
+      summary: Order detail — line items, customer info, status control (F-042; Screen 26)
+      operationId: adminGetOrder
+      security: [{ staffSessionCookie: [] }]
+      parameters:
+        - $ref: '#/components/parameters/OrderIdParam'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/Order' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /admin/orders/{orderId}/status:
+    patch:
+      tags: [admin-fulfillment]
+      summary: >
+        Advance (one step) or Override (jump to any status) — Override permanently stops
+        that order's auto-timer (F-043, D3, A2, A3, §3.11; Screen 26)
+      operationId: adminUpdateOrderStatus
+      security: [{ staffSessionCookie: [] }]
+      parameters:
+        - $ref: '#/components/parameters/OrderIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OrderStatusUpdateRequest' }
+            examples:
+              advance:
+                value: { action: "advance" }
+              override:
+                value: { action: "override", targetStatus: "ready" }
+      responses:
+        '200':
+          description: >
+            Status updated; on the frontend a failed mocked update reverts status to the
+            last known-good value rather than leaving it ambiguous (Screen 26 Error state).
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/Order' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: Invalid transition (e.g. Advance attempted at completed, or malformed override target)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+# ---------------------------------------------------------------------------
+# Components
+# ---------------------------------------------------------------------------
+components:
+
+  securitySchemes:
+    customerSessionCookie:
+      type: apiKey
+      in: cookie
+      name: csess
+      description: Customer identity domain session (spec §3.1) — independent from staff session
+    staffSessionCookie:
+      type: apiKey
+      in: cookie
+      name: ssess
+      description: Staff identity domain session (spec §3.1) — role carried in StaffUser.role
+
+  parameters:
+    PageParam:
+      name: page
+      in: query
+      schema: { type: integer, minimum: 1, default: 1 }
+    LimitParam:
+      name: limit
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    ProductIdParam:
+      name: productId
+      in: path
+      required: true
+      schema: { type: string }
+    CategoryIdParam:
+      name: categoryId
+      in: path
+      required: true
+      schema: { type: string }
+    CategorySlugParam:
+      name: categorySlug
+      in: path
+      required: true
+      schema: { type: string }
+    OrderIdParam:
+      name: orderId
+      in: path
+      required: true
+      schema: { type: string }
+
+  responses:
+    ValidationError:
+      description: One or more fields failed validation (422)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+          examples:
+            default:
+              value:
+                success: false
+                data: null
+                error:
+                  code: "VALIDATION_ERROR"
+                  message: "One or more fields are invalid."
+                  details: null
+                  fieldErrors:
+                    - { field: "email", message: "Enter a valid email address." }
+                meta: { requestId: "req_8", timestamp: "2026-07-22T03:00:00Z", durationMs: 4 }
+    InvalidCredentials:
+      description: Auth failure — invalid email/password or username/password (401)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+          examples:
+            default:
+              value:
+                success: false
+                data: null
+                error: { code: "INVALID_CREDENTIALS", message: "Incorrect email or password.", details: null, fieldErrors: null }
+                meta: { requestId: "req_9", timestamp: "2026-07-22T03:00:00Z", durationMs: 3 }
+    Unauthorized:
+      description: No/expired session (401)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+          examples:
+            default:
+              value:
+                success: false
+                data: null
+                error: { code: "SESSION_EXPIRED", message: "Session expired, please log in again.", details: null, fieldErrors: null }
+                meta: { requestId: "req_10", timestamp: "2026-07-22T03:00:00Z", durationMs: 3 }
+    Forbidden:
+      description: Authenticated but wrong staff role (403)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+          examples:
+            default:
+              value:
+                success: false
+                data: null
+                error: { code: "FORBIDDEN_ROLE", message: "You do not have access to this section.", details: null, fieldErrors: null }
+                meta: { requestId: "req_11", timestamp: "2026-07-22T03:00:00Z", durationMs: 3 }
+    NotFound:
+      description: Entity does not exist — triggers the 404 screen client-side (F-047)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+          examples:
+            default:
+              value:
+                success: false
+                data: null
+                error: { code: "NOT_FOUND", message: "The requested resource was not found.", details: null, fieldErrors: null }
+                meta: { requestId: "req_12", timestamp: "2026-07-22T03:00:00Z", durationMs: 3 }
+    CategoryHasProductsConflict:
+      description: Category delete blocked — products still assigned (D1, A1, F-039)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+          examples:
+            default:
+              value:
+                success: false
+                data: null
+                error:
+                  code: "CATEGORY_HAS_PRODUCTS"
+                  message: "This category has 4 assigned products and cannot be deleted."
+                  details: { assignedProductCount: 4, categoryId: "cat_2" }
+                  fieldErrors: null
+                meta: { requestId: "req_13", timestamp: "2026-07-22T03:00:00Z", durationMs: 5 }
+    CategoryNameConflict:
+      description: Category name already exists (case-insensitive) (F-037, F-038)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+          examples:
+            default:
+              value:
+                success: false
+                data: null
+                error:
+                  code: "CATEGORY_NAME_EXISTS"
+                  message: "A category named 'Coffee' already exists."
+                  details: null
+                  fieldErrors: [{ field: "name", message: "A category named 'Coffee' already exists." }]
+                meta: { requestId: "req_14", timestamp: "2026-07-22T03:00:00Z", durationMs: 4 }
+    EmailExistsConflict:
+      description: Account email already registered, case-insensitive (F-018)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+          examples:
+            default:
+              value:
+                success: false
+                data: null
+                error:
+                  code: "EMAIL_EXISTS"
+                  message: "An account with this email already exists."
+                  details: null
+                  fieldErrors: [{ field: "email", message: "An account with this email already exists." }]
+                meta: { requestId: "req_15", timestamp: "2026-07-22T03:00:00Z", durationMs: 4 }
+    ServerError:
+      description: Unexpected mocked server failure (500)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+          examples:
+            default:
+              value:
+                success: false
+                data: null
+                error: { code: "SERVER_ERROR", message: "Something went wrong. Please try again.", details: null, fieldErrors: null }
+                meta: { requestId: "req_16", timestamp: "2026-07-22T03:00:00Z", durationMs: 2 }
+
+  schemas:
+
+    # ---- Envelope -------------------------------------------------------
+    Meta:
+      type: object
+      required: [requestId, timestamp, durationMs]
+      properties:
+        requestId: { type: string }
+        timestamp: { type: string, format: date-time }
+        durationMs: { type: integer, minimum: 0 }
+
+    SuccessBase:
+      type: object
+      required: [success, error, meta]
+      properties:
+        success: { type: boolean, const: true }
+        error: { type: "null" }
+        meta: { $ref: '#/components/schemas/Meta' }
+
+    FieldError:
+      type: object
+      required: [field, message]
+      properties:
+        field: { type: string }
+        message: { type: string }
+
+    ErrorObject:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          description: >
+            Stable machine-readable error code. See API-Contract error-code table in
+            Stage 4 delivery notes for the full enumerated list.
+        message: { type: string }
+        details:
+          description: Optional structured context (e.g. assignedProductCount, unavailableLines)
+          nullable: true
+        fieldErrors:
+          type: array
+          nullable: true
+          items: { $ref: '#/components/schemas/FieldError' }
+
+    ErrorEnvelope:
+      type: object
+      required: [success, data, error, meta]
+      properties:
+        success: { type: boolean, const: false }
+        data: { type: "null" }
+        error: { $ref: '#/components/schemas/ErrorObject' }
+        meta: { $ref: '#/components/schemas/Meta' }
+
+    PaginationMeta:
+      type: object
+      required: [page, limit, totalItems, totalPages]
+      properties:
+        page: { type: integer, minimum: 1 }
+        limit: { type: integer, minimum: 1 }
+        totalItems: { type: integer, minimum: 0 }
+        totalPages: { type: integer, minimum: 0 }
+
+    CountData:
+      type: object
+      required: [count]
+      properties:
+        count: { type: integer, minimum: 0 }
+
+    # ---- Catalog ----------------------------------------------------------
+    Category:
+      type: object
+      required: [id, name, slug]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        slug: { type: string }
+        productCount: { type: integer, minimum: 0, description: "Included on admin list/edit and where shown (F-036, F-039)" }
+
+    CategoryCreateRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1 }
+
+    CategoryUpdateRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1 }
+
+    CustomizationOption:
+      type: object
+      required: [id, label, priceDelta]
+      properties:
+        id: { type: string }
+        label: { type: string }
+        priceDelta:
+          type: integer
+          minimum: 0
+          description: Additive delta in IDR on top of base price (D4)
+
+    CustomizationGroup:
+      type: object
+      required: [id, name, type, required, options]
+      properties:
+        id: { type: string }
+        name: { type: string, example: "Size" }
+        type: { type: string, enum: [single, multi] }
+        required: { type: boolean }
+        options:
+          type: array
+          items: { $ref: '#/components/schemas/CustomizationOption' }
+
+    Product:
+      type: object
+      required: [id, name, categoryId, categoryName, basePrice, available, isDeleted]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        categoryId: { type: string }
+        categoryName: { type: string }
+        basePrice: { type: integer, minimum: 0, description: IDR integer, no decimals }
+        image: { type: string, nullable: true, description: "Mocked upload data URL or seed asset path" }
+        tags:
+          type: array
+          items: { type: string }
+        available: { type: boolean }
+        isDeleted: { type: boolean, description: "Soft-delete flag (D2, §3.13)" }
+
+    ProductDetail:
+      allOf:
+        - $ref: '#/components/schemas/Product'
+        - type: object
+          required: [description, images]
+          properties:
+            description: { type: string }
+            images:
+              type: array
+              items: { type: string }
+            customizationGroups:
+              type: array
+              items: { $ref: '#/components/schemas/CustomizationGroup' }
+            lastUpdatedAt: { type: string, format: date-time, nullable: true }
+
+    ProductCreateRequest:
+      type: object
+      required: [name, categoryId, price, description]
+      properties:
+        name: { type: string, minLength: 1 }
+        categoryId: { type: string }
+        price: { type: integer, exclusiveMinimum: 0 }
+        description: { type: string, minLength: 1 }
+        image: { type: string, nullable: true, description: "Mocked upload — accepted as a data URL, soft 5MB limit enforced client-side" }
+        available: { type: boolean, default: true }
+        customizationGroups:
+          type: array
+          items: { $ref: '#/components/schemas/CustomizationGroup' }
+
+    ProductUpdateRequest:
+      allOf:
+        - $ref: '#/components/schemas/ProductCreateRequest'
+
+    # ---- Cart ---------------------------------------------------------
+    CartLineInput:
+      type: object
+      required: [productId, quantity]
+      properties:
+        productId: { type: string }
+        quantity: { type: integer, minimum: 1 }
+        selectedOptionIds:
+          type: array
+          items: { type: string }
+          description: Flattened list of chosen CustomizationOption ids across all groups
+
+    CartLineValidated:
+      type: object
+      required: [productId, name, unitPrice, quantity, lineTotal, available]
+      properties:
+        productId: { type: string }
+        name: { type: string }
+        customizationSummary: { type: string, nullable: true, example: "Large, Oat Milk, +Extra Shot" }
+        unitPrice: { type: integer, minimum: 0, description: "base + Σ(selected option deltas), frozen at add-to-cart time (D4, §3.12)" }
+        quantity: { type: integer, minimum: 1 }
+        lineTotal: { type: integer, minimum: 0 }
+        available: { type: boolean }
+        unavailableReason: { type: string, nullable: true }
+
+    PromoValidateRequest:
+      type: object
+      required: [code, subtotal]
+      properties:
+        code: { type: string, minLength: 1 }
+        subtotal: { type: integer, minimum: 0 }
+
+    PromoValidateResult:
+      type: object
+      required: [valid, code, discountAmount]
+      properties:
+        valid: { type: boolean }
+        code: { type: string }
+        type: { type: string, enum: [percent, fixed], nullable: true }
+        value: { type: integer, nullable: true, description: "Percent (0-100) or fixed IDR amount depending on type" }
+        discountAmount: { type: integer, minimum: 0, description: "Resolved IDR discount; 0 when invalid" }
+        message: { type: string, nullable: true }
+
+    # ---- Checkout / Orders ---------------------------------------------
+    FulfillmentMethod:
+      type: string
+      enum: [pickup, dine-in, delivery]
+
+    PaymentMethod:
+      type: string
+      description: Mocked demo payment options; "demo_declined_card" is the deliberately-triggerable failure path (F-013)
+      enum: [demo_credit_card, demo_cash_on_pickup, demo_e_wallet, demo_declined_card]
+
+    Address:
+      type: object
+      required: [line1, city, postalCode]
+      properties:
+        line1: { type: string, minLength: 1 }
+        line2: { type: string, nullable: true }
+        city: { type: string, minLength: 1 }
+        postalCode: { type: string, pattern: "^[0-9]{4,10}$" }
+
+    CheckoutDetails:
+      type: object
+      required: [fullName, email, phone, fulfillmentMethod]
+      properties:
+        fullName: { type: string, minLength: 1 }
+        email: { type: string, format: email }
+        phone: { type: string, pattern: "^\\+?[0-9]{8,15}$" }
+        fulfillmentMethod: { $ref: '#/components/schemas/FulfillmentMethod' }
+        address:
+          allOf: [{ $ref: '#/components/schemas/Address' }]
+          nullable: true
+          description: Required when fulfillmentMethod = delivery (A6)
+
+    OrderCreateRequest:
+      type: object
+      required: [details, paymentMethod, lines]
+      properties:
+        details: { $ref: '#/components/schemas/CheckoutDetails' }
+        paymentMethod: { $ref: '#/components/schemas/PaymentMethod' }
+        promoCode: { type: string, nullable: true }
+        lines:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/CartLineInput' }
+
+    OrderLine:
+      type: object
+      required: [productId, name, unitPrice, quantity, lineTotal]
+      properties:
+        productId: { type: string }
+        name: { type: string }
+        customizationSummary: { type: string, nullable: true }
+        unitPrice: { type: integer, minimum: 0 }
+        quantity: { type: integer, minimum: 1 }
+        lineTotal: { type: integer, minimum: 0 }
+
+    OrderStatus:
+      type: string
+      description: "Strictly forward by default (§3.11): received -> preparing -> ready -> completed"
+      enum: [received, preparing, ready, completed]
+
+    OrderCustomer:
+      type: object
+      required: [name, isGuest]
+      properties:
+        name: { type: string }
+        email: { type: string, format: email, nullable: true }
+        phone: { type: string, nullable: true }
+        isGuest: { type: boolean }
+        accountId: { type: string, nullable: true }
+
+    Order:
+      type: object
+      required: [id, status, createdAt, fulfillmentMethod, paymentMethod, lines, subtotal, tax, discount, total, customer]
+      properties:
+        id: { type: string }
+        status: { $ref: '#/components/schemas/OrderStatus' }
+        createdAt: { type: string, format: date-time }
+        estimatedReadyAt: { type: string, format: date-time, nullable: true }
+        lastStatusChangeAt: { type: string, format: date-time, nullable: true, description: "A8 — lightweight timestamp only, no full audit log" }
+        autoProgressionStopped: { type: boolean, description: "True once staff Override/Advance has touched this order (A2)" }
+        fulfillmentMethod: { $ref: '#/components/schemas/FulfillmentMethod' }
+        address:
+          allOf: [{ $ref: '#/components/schemas/Address' }]
+          nullable: true
+        paymentMethod: { $ref: '#/components/schemas/PaymentMethod' }
+        lines:
+          type: array
+          items: { $ref: '#/components/schemas/OrderLine' }
+        subtotal: { type: integer, minimum: 0 }
+        tax: { type: integer, minimum: 0, description: "Mocked flat percentage, always labeled explicitly (§3.5)" }
+        discount: { type: integer, minimum: 0 }
+        total: { type: integer, minimum: 0 }
+        customer: { $ref: '#/components/schemas/OrderCustomer' }
+
+    OrderSummary:
+      type: object
+      required: [id, placedAt, status, total, itemCount, fulfillmentMethod]
+      properties:
+        id: { type: string }
+        placedAt: { type: string, format: date-time }
+        status: { $ref: '#/components/schemas/OrderStatus' }
+        total: { type: integer, minimum: 0 }
+        itemCount: { type: integer, minimum: 0 }
+        fulfillmentMethod: { $ref: '#/components/schemas/FulfillmentMethod' }
+        customerName: { type: string, description: "Present on admin list (F-041); omitted on customer's own history" }
+
+    OrderStatusUpdateRequest:
+      type: object
+      required: [action]
+      properties:
+        action: { type: string, enum: [advance, override] }
+        targetStatus:
+          allOf: [{ $ref: '#/components/schemas/OrderStatus' }]
+          nullable: true
+          description: Required when action = override
+
+    UnavailableItem:
+      type: object
+      required: [productId, name]
+      properties:
+        productId: { type: string }
+        name: { type: string }
+
+    ReorderResult:
+      type: object
+      required: [addedLines, unavailableItems]
+      properties:
+        addedLines:
+          type: array
+          items: { $ref: '#/components/schemas/CartLineValidated' }
+        unavailableItems:
+          type: array
+          items: { $ref: '#/components/schemas/UnavailableItem' }
+
+    # ---- Auth / Account -------------------------------------------------
+    User:
+      type: object
+      required: [id, name, email, memberSince]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        email: { type: string, format: email }
+        phone: { type: string, nullable: true }
+        memberSince: { type: string, format: date-time }
+
+    StaffRole:
+      type: string
+      enum: [catalog-admin, fulfillment-staff]
+
+    StaffUser:
+      type: object
+      required: [id, name, role]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        role: { $ref: '#/components/schemas/StaffRole' }
+
+    CustomerRegisterRequest:
+      type: object
+      required: [name, email, password, confirmPassword]
+      properties:
+        name: { type: string, minLength: 1 }
+        email: { type: string, format: email }
+        password: { type: string, minLength: 8 }
+        confirmPassword: { type: string, minLength: 8 }
+
+    CustomerLoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, minLength: 1 }
+        rememberMe: { type: boolean, default: false }
+
+    StaffLoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username: { type: string, minLength: 1 }
+        password: { type: string, minLength: 1 }
+
+    ProfileUpdateRequest:
+      type: object
+      properties:
+        name: { type: string, minLength: 1 }
+        phone: { type: string, pattern: "^\\+?[0-9]{8,15}$" }
+
+    # ---- Store Info -----------------------------------------------------
+    StoreHours:
+      type: object
+      required: [day, openTime, closeTime]
+      properties:
+        day: { type: string, enum: [Mon, Tue, Wed, Thu, Fri, Sat, Sun] }
+        openTime: { type: string, example: "08:00" }
+        closeTime: { type: string, example: "21:00" }
+
+    StoreInfo:
+      type: object
+      required: [hours, address, phone]
+      properties:
+        hours:
+          type: array
+          items: { $ref: '#/components/schemas/StoreHours' }
+        address: { type: string }
+        phone: { type: string }
+        mapPlaceholderUrl: { type: string, nullable: true }

@@ -1,0 +1,170 @@
+DEBUG availToggle count: 1
+DEBUG before: true
+DEBUG clicked
+DEBUG after: false
+{
+  "results": {
+    "screens": [
+      {
+        "screen": "17-AdminLogin",
+        "status": "PASS",
+        "notes": "catalog-admin login succeeded, redirected to /admin"
+      },
+      {
+        "screen": "18-AdminDashboard",
+        "status": "PASS",
+        "notes": "snippet=Kopi Kita Admin Dashboard Products Categories  Signed in as Dewi Kusuma  Log out Dashboard Products 33 Categories 7 Manage Products Manage Categories"
+      },
+      {
+        "screen": "19-AdminProductList",
+        "status": "PASS",
+        "notes": "rows=33; snippet=Kopi Kita Admin Dashboard Products Categories  Signed in as Dewi Kusuma  Log out Products New Product All availability Show deleted Name\tCategory\tPric"
+      },
+      {
+        "screen": "20-AdminProductCreate",
+        "status": "PASS",
+        "notes": "created product successfully"
+      },
+      {
+        "screen": "21-AdminProductEdit",
+        "status": "PASS",
+        "notes": "snippet=Kopi Kita Admin Dashboard Products Categories  Signed in as Dewi Kusuma  Log out Edit Product  Last updated: 22 Jul 2026 14:46  Delete Name* Category*"
+      },
+      {
+        "screen": "22-AdminCategoryList",
+        "status": "PASS",
+        "notes": "snippet=Kopi Kita Admin Dashboard Products Categories  Signed in as Dewi Kusuma  Log out Categories New Category Name\tProducts\tActions Espresso\t7\tEditDelete Brewed Coffee\t5\tEditDelete Non-Coffee\t5\tEditDelete "
+      },
+      {
+        "screen": "23-AdminCategoryCreate",
+        "status": "PASS",
+        "notes": "created category successfully"
+      },
+      {
+        "screen": "24-AdminCategoryEdit",
+        "status": "PASS",
+        "notes": "reached category edit page"
+      },
+      {
+        "screen": "17b-AdminLogin-FulfillmentStaff",
+        "status": "PASS",
+        "notes": "fulfillment-staff login succeeded"
+      },
+      {
+        "screen": "25-AdminOrderList",
+        "status": "PASS",
+        "notes": "rows=4; snippet=Kopi Kita Admin Dashboard Orders  Signed in as Budi Santoso  Log out Orders All Newest first Order\tPlaced\tCustomer\tMethod\tStatus\tTotal #order_1\t22 Jul 2026 14:40\tGuest Customer\tPickup\tReceived\tRp 115."
+      },
+      {
+        "screen": "26-AdminOrderDetail",
+        "status": "PASS",
+        "notes": "snippet=Kopi Kita Admin Dashboard Orders  Signed in as Budi Santoso  Log out Order #order_1  Placed 22 Jul 2026 14:40  Received Customer  Guest Customer  guest1@example.com  +6281111111111  Pickup  Items 2× Cappuccino Rp 80.000 1× Butter Croissant Rp 25.000 "
+      }
+    ],
+    "flows": [
+      {
+        "name": "AdminLogin-Wrong-Credentials",
+        "status": "PASS",
+        "notes": "Kopi Kita Staff Login  Catalog Admin & Fulfillment Staff shared entry point.  Username* Password*  Incorrect email or password.  Log in"
+      },
+      {
+        "name": "DEFECT-Admin-Reload-Session-Loss",
+        "status": "FAIL",
+        "notes": "urlAfter=http://localhost:4173/admin/login?returnTo=%2Fadmin%2Flogin; bodySnippet=Kopi Kita Staff Login  Catalog Admin & Fulfillment Staff shared entry point.  Username* Password* Log in Session expired, please log in again. Session"
+      },
+      {
+        "name": "Product-ShowDeleted-Toggle",
+        "status": "PASS",
+        "notes": "expected soft-deleted 'Seasonal Pumpkin Latte' to appear"
+      },
+      {
+        "name": "ProductCreate-Empty-Validation",
+        "status": "PASS",
+        "notes": "Kopi Kita Admin Dashboard Products Categories  Signed in as Dewi Kusuma  Log out New Product Name*  Name is required.  Category* Select a category Espresso Brewed Coffee Non-Coffee Tea Pastries Breakf"
+      },
+      {
+        "name": "ProductCreate-Success",
+        "status": "PASS",
+        "notes": "expected new product 'QA Test Product 1784706369398' in list"
+      },
+      {
+        "name": "ProductEdit-Success",
+        "status": "PASS",
+        "notes": "expected updated price Rp 27.000 in list"
+      },
+      {
+        "name": "Product-Availability-Toggle",
+        "status": "PASS",
+        "notes": "before=true after=false"
+      },
+      {
+        "name": "Product-SoftDelete",
+        "status": "PASS",
+        "notes": "soft-deleted product should disappear from default list view"
+      },
+      {
+        "name": "Product-Restore",
+        "status": "FAIL",
+        "notes": "No Restore control found on soft-deleted row in list view"
+      },
+      {
+        "name": "Category-Delete-Guard-409",
+        "status": "FAIL",
+        "notes": "Kopi Kita Admin Dashboard Products Categories  Signed in as Dewi Kusuma  Log out Categories New Category Name\tProducts\tActions Espresso\t7\tEditDelete Brewed Coffee\t5\tEditDelete Non-Coffee\t5\tEditDelete Tea\t4\tEditDelete Pastries\t5\tEditDelete Breakfast\t3"
+      },
+      {
+        "name": "CategoryCreate-Duplicate",
+        "status": "PASS",
+        "notes": "Kopi Kita Admin Dashboard Products Categories  Signed in as Dewi Kusuma  Log out New Category Name*  A category named 'Espresso' already exists.  Save Cancel"
+      },
+      {
+        "name": "CategoryCreate-Success",
+        "status": "PASS",
+        "notes": "expected 'QA Category 1784706380002' in list"
+      },
+      {
+        "name": "CategoryDelete-ZeroProducts-Success",
+        "status": "PASS",
+        "notes": "zero-product category should delete successfully"
+      },
+      {
+        "name": "OrderRow-WholeRowClickability",
+        "status": "FAIL",
+        "notes": "TableRow has cursor-pointer styling implying the whole row is clickable, but only the order-number cell's <a> link actually navigates — clicking elsewhere in the row is a no-op."
+      },
+      {
+        "name": "Order-Advance-Status",
+        "status": "PASS",
+        "notes": "expected status to change after Advance"
+      },
+      {
+        "name": "Order-Override-Status",
+        "status": "PASS",
+        "notes": "Kopi Kita Admin Dashboard Orders  Signed in as Budi Santoso  Log out Order #order_1  Placed 22 Jul 2026 14:40  Completed Customer  Guest Customer  guest1@example.com  +6281111111111  Pickup  Items 2× "
+      }
+    ],
+    "defects": [
+      {
+        "screen": "DEFECT-Admin-Reload-Session-Loss",
+        "severity": "high",
+        "notes": "urlAfter=http://localhost:4173/admin/login?returnTo=%2Fadmin%2Flogin; bodySnippet=Kopi Kita Staff Login  Catalog Admin & Fulfillment Staff shared entry point.  Username* Password* Log in Session expired, please log in again. Session"
+      },
+      {
+        "screen": "Product-Restore",
+        "severity": "high",
+        "notes": "No Restore control found on soft-deleted row in list view"
+      },
+      {
+        "screen": "Category-Delete-Guard-409",
+        "severity": "high",
+        "notes": "Kopi Kita Admin Dashboard Products Categories  Signed in as Dewi Kusuma  Log out Categories New Category Name\tProducts\tActions Espresso\t7\tEditDelete Brewed Coffee\t5\tEditDelete Non-Coffee\t5\tEditDelete Tea\t4\tEditDelete Pastries\t5\tEditDelete Breakfast\t3"
+      },
+      {
+        "screen": "OrderRow-WholeRowClickability",
+        "severity": "low",
+        "notes": "TableRow has cursor-pointer styling implying the whole row is clickable, but only the order-number cell's <a> link actually navigates — clicking elsewhere in the row is a no-op."
+      }
+    ]
+  },
+  "consoleErrorCount": 9
+}

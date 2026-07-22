@@ -1,0 +1,12 @@
+node_modules
+dist
+.git
+.gitignore
+.env
+.env.*
+*.local
+*.tsbuildinfo
+.DS_Store
+.qa-scratch
+npm-debug.log*
+DEPLOYMENT.md

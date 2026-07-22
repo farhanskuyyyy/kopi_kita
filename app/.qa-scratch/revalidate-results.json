@@ -1,0 +1,142 @@
+{
+  "sessionReload": [
+    {
+      "name": "Customer-Reload /account",
+      "status": "PASS",
+      "notes": "url=http://localhost:4173/account; falseExpiry=false"
+    },
+    {
+      "name": "Customer-Reload /account/orders",
+      "status": "PASS",
+      "notes": "url=http://localhost:4173/account/orders; falseExpiry=false"
+    },
+    {
+      "name": "Customer-Reload /account/favorites",
+      "status": "PASS",
+      "notes": "url=http://localhost:4173/account/favorites; falseExpiry=false"
+    },
+    {
+      "name": "CatalogAdmin-Reload /admin",
+      "status": "PASS",
+      "notes": "url=http://localhost:4173/admin; falseExpiry=false"
+    },
+    {
+      "name": "CatalogAdmin-Reload /admin/products",
+      "status": "PASS",
+      "notes": "url=http://localhost:4173/admin/products; falseExpiry=false"
+    },
+    {
+      "name": "CatalogAdmin-Reload /admin/products/new",
+      "status": "PASS",
+      "notes": "url=http://localhost:4173/admin/products/new; falseExpiry=false"
+    },
+    {
+      "name": "FulfillmentStaff-Reload /admin",
+      "status": "PASS",
+      "notes": "url=http://localhost:4173/admin; falseExpiry=false"
+    },
+    {
+      "name": "FulfillmentStaff-Reload /admin/orders",
+      "status": "PASS",
+      "notes": "url=http://localhost:4173/admin/orders; falseExpiry=false"
+    },
+    {
+      "name": "FulfillmentStaff-Reload /admin/orders/order_1",
+      "status": "PASS",
+      "notes": "url=http://localhost:4173/admin/orders/order_1; falseExpiry=false"
+    }
+  ],
+  "invalidToken": [
+    {
+      "name": "Invalid-Token-Still-Redirects",
+      "status": "PASS",
+      "notes": "url=http://localhost:4173/login?returnTo=%2Faccount%2Forders; sessionExpiredMsg=true"
+    },
+    {
+      "name": "Invalid-Staff-Token-Still-Redirects",
+      "status": "PASS",
+      "notes": "url=http://localhost:4173/admin/login?returnTo=%2Fadmin%2Fproducts"
+    }
+  ],
+  "a11y": [
+    {
+      "page": "Menu",
+      "critical": 0,
+      "buttonName": 0,
+      "all": "none"
+    },
+    {
+      "page": "Search",
+      "critical": 0,
+      "buttonName": 0,
+      "all": "none"
+    },
+    {
+      "page": "AdminProductList",
+      "critical": 1,
+      "buttonName": 1,
+      "all": "critical:button-name(33)"
+    },
+    {
+      "page": "AdminOrderList",
+      "critical": 0,
+      "buttonName": 0,
+      "all": "serious:color-contrast(1)"
+    },
+    {
+      "page": "OrderHistory",
+      "critical": 0,
+      "buttonName": 0,
+      "all": "serious:color-contrast(1)"
+    }
+  ],
+  "regression": [
+    {
+      "name": "Regression-FullPurchase",
+      "status": "PASS",
+      "notes": "order placed at http://localhost:4173/order/confirmation/order_5"
+    },
+    {
+      "name": "Regression-AdminProductCreate",
+      "status": "PASS",
+      "notes": "created 'Reg Product 1784708389420'=true"
+    },
+    {
+      "name": "Regression-AdminProductEdit",
+      "status": "PASS",
+      "notes": "price updated=true"
+    },
+    {
+      "name": "Regression-CategoryDeleteGuard-Disabled",
+      "status": "PASS",
+      "notes": "Espresso delete button disabled=true (fix #3 expects true)"
+    },
+    {
+      "name": "Regression-CategoryDeleteGuard-Blocks",
+      "status": "PASS",
+      "notes": "delete proactively disabled, deletion impossible"
+    },
+    {
+      "name": "Regression-Logout-Lands-Home",
+      "status": "PASS",
+      "notes": "landed on http://localhost:4173/"
+    },
+    {
+      "name": "Regression-Unauth-Admin-Gate",
+      "status": "PASS",
+      "notes": "url=http://localhost:4173/admin/login?returnTo=%2Fadmin%2Fproducts"
+    },
+    {
+      "name": "Regression-WrongRole-Gate",
+      "status": "PASS",
+      "notes": "url=http://localhost:4173/admin"
+    }
+  ],
+  "defects": [
+    {
+      "screen": "a11y:AdminProductList",
+      "severity": "high",
+      "notes": "1 critical: button-name"
+    }
+  ]
+}

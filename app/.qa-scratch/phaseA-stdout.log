@@ -1,0 +1,125 @@
+{
+  "results": {
+    "screens": [
+      {
+        "screen": "1-Home",
+        "status": "PASS",
+        "notes": "loaded; category tiles=14; console_errors_so_far=0"
+      },
+      {
+        "screen": "2-Menu",
+        "status": "PASS",
+        "notes": "/menu products=24; /menu/espresso products=7; hasEspressoHeading=true"
+      },
+      {
+        "screen": "2-Menu-404",
+        "status": "PASS",
+        "notes": "invalid categorySlug correctly renders 404"
+      },
+      {
+        "screen": "2-Menu-filter-reset",
+        "status": "PASS",
+        "notes": "min>max filter body snippet: Skip to content Kopi Kita Espresso Brewed Coffee Non-Coffee Tea Pastries Breakfast Merchandise Menu All Products In stock only Popularity  24 products"
+      },
+      {
+        "screen": "2-Menu-sort-fallback",
+        "status": "PASS",
+        "notes": "invalid sort did not crash. snippet: Skip to content Kopi Kita Espresso Brewed Coffee Non-Coffee Tea Pastries Breakfast Merchandise Menu "
+      },
+      {
+        "screen": "3-Search",
+        "status": "PASS",
+        "notes": "empty-q prompt ok=true; 'latte' results snippet=Skip to content Kopi Kita Espresso Brewed Coffee Non-Coffee Tea Pastries Breakfa; empty-search-ok=true"
+      },
+      {
+        "screen": "4-ProductDetail",
+        "status": "PASS",
+        "notes": "required-field-validation-shown=true; nonexistent-id-404=true; out-of-stock-badge=true; add-to-cart-disabled-when-oos=null"
+      },
+      {
+        "screen": "5-Cart",
+        "status": "PASS",
+        "notes": "cart shows item, snippet=Skip to content Kopi Kita 1 Espresso Brewed Coffee Non-Coffee Tea Pastries Breakfast Merchandise Your Cart  Caffe Latte "
+      },
+      {
+        "screen": "5-Cart-Promo",
+        "status": "PASS",
+        "notes": "invalid-code-message-shown=true; valid-code-discount-shown=true"
+      },
+      {
+        "screen": "6-CheckoutDetails-nav",
+        "status": "PASS",
+        "notes": "reached /checkout/details"
+      },
+      {
+        "screen": "6-CheckoutDetails-delivery",
+        "status": "PASS",
+        "notes": "address subform shown on delivery select=true"
+      },
+      {
+        "screen": "7-CheckoutPayment-nav",
+        "status": "PASS",
+        "notes": "reached /checkout/payment"
+      },
+      {
+        "screen": "8-CheckoutReview-nav",
+        "status": "PASS",
+        "notes": "reached /checkout/review"
+      },
+      {
+        "screen": "9-OrderConfirmation",
+        "status": "PASS",
+        "notes": "order placed, url=http://localhost:4173/order/confirmation/order_5"
+      },
+      {
+        "screen": "10-OrderTracking",
+        "status": "PASS",
+        "notes": "tracking page snippet=Skip to content Kopi Kita Espresso Brewed Coffee Non-Coffee Tea Pastries Breakfast Merchandise Track Order #order_5 Refresh status Received Preparing "
+      },
+      {
+        "screen": "16-StoreInfo",
+        "status": "PASS",
+        "notes": "snippet=Skip to content Kopi Kita Espresso Brewed Coffee Non-Coffee Tea Pastries Breakfast Merchandise Store Info Mon 07:00 – 21:00 Tue 07:00 – 21:00 Wed 07:0"
+      },
+      {
+        "screen": "27-NotFound",
+        "status": "PASS",
+        "notes": "shows 404"
+      }
+    ],
+    "flows": [
+      {
+        "name": "Payment-Failure-Path",
+        "status": "PASS",
+        "notes": "failShown=true; stillOnPayment=true"
+      },
+      {
+        "name": "Guest-Confirmation-Banner-A5",
+        "status": "PASS",
+        "notes": "banner shown=true"
+      },
+      {
+        "name": "Order-404-guard",
+        "status": "PASS",
+        "notes": "404 — Page not found\n\nWe couldn't find what you were looking for. It may have been moved or no longer exists.\n\nBack to Home"
+      },
+      {
+        "name": "Empty-Cart-Guard",
+        "status": "PASS",
+        "notes": "direct nav to /checkout/details with empty cart -> http://localhost:4173/cart"
+      },
+      {
+        "name": "Forced-500-error-banner",
+        "status": "PASS",
+        "notes": "bannerVisibleEls=2; bodySnippet=Skip to content Kopi Kita Espresso Brewed Coffee Non-Coffee Tea Pastries Breakfast Merchandise Menu … … In stock only Popularity  Couldn't load products.  Retry  © 2026 Kopi Kita. All rights reserved."
+      },
+      {
+        "name": "Forced-Stock-Unavailable",
+        "status": "PASS",
+        "notes": "Skip to content Kopi Kita 1 Espresso Brewed Coffee Non-Coffee Tea Pastries Breakfast Merchandise Your Cart  Caffe Latte  Small, Regular Milk  This item is currently out of stock.  Rp 33.000 each  1  Rp 33.000  Remove Resolve unavailable items before "
+      }
+    ],
+    "defects": []
+  },
+  "consoleErrorCount": 4
+}

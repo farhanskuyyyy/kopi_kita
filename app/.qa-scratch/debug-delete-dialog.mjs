@@ -1,0 +1,17 @@
+import { chromium } from "playwright";
+const browser = await chromium.launch();
+const page = await browser.newPage();
+await page.goto("http://localhost:4173/admin/login", { waitUntil: "networkidle" });
+await page.fill("#username", "admin.catalog");
+await page.fill("#password", "Admin123!");
+await page.locator("button[type=submit]").click();
+await page.waitForURL("**/admin", { timeout: 6000 });
+await page.locator("a[href='/admin/products']").first().click();
+await page.waitForURL("**/admin/products");
+await page.waitForTimeout(700);
+const row = page.locator("tr", { hasText: "Caffe Latte" });
+await row.locator("button:has-text('Delete')").first().click();
+await page.waitForTimeout(500);
+console.log("dialog role=dialog count:", await page.locator("[role=dialog]").count());
+console.log("dialog buttons:", await page.locator("[role=dialog] button").allInnerTexts());
+await browser.close();

@@ -1,0 +1,23 @@
+import { chromium } from "playwright";
+const browser = await chromium.launch();
+const page = await browser.newPage();
+await page.goto("http://localhost:4173/admin/login", { waitUntil: "networkidle" });
+await page.fill("#username", "admin.catalog");
+await page.fill("#password", "Admin123!");
+await page.locator("button[type=submit]").click();
+await page.waitForURL("**/admin", { timeout: 6000 });
+await page.locator("a[href='/admin/products']").first().click();
+await page.waitForURL("**/admin/products");
+await page.waitForTimeout(700);
+
+const row = page.locator("tr", { hasText: "Caffe Latte" });
+console.log("row count for Caffe Latte:", await row.count());
+const switches = row.locator("button[role=switch]");
+console.log("switch count in row:", await switches.count());
+const before = await switches.first().getAttribute("aria-checked");
+console.log("before:", before);
+await switches.first().click();
+await page.waitForTimeout(800);
+const after = await switches.first().getAttribute("aria-checked");
+console.log("after:", after);
+await browser.close();

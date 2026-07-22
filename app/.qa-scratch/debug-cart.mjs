@@ -1,0 +1,21 @@
+import { chromium } from "playwright";
+const browser = await chromium.launch();
+const page = await browser.newPage();
+page.on("console", (msg) => console.log(`[console.${msg.type()}]`, msg.text()));
+page.on("pageerror", (e) => console.log("[pageerror]", e.message));
+
+await page.goto("http://localhost:4173/", { waitUntil: "networkidle" });
+await page.getByRole("link", { name: /browse menu/i }).click();
+await page.waitForURL("**/menu");
+await page.locator("a.group").first().click();
+await page.waitForURL(/\/product\//);
+await page.locator("button:has-text('Add to Cart')").click();
+await page.waitForTimeout(1000);
+await page.goto("http://localhost:4173/cart", { waitUntil: "networkidle" });
+await page.waitForTimeout(1500);
+console.log("URL:", page.url());
+const bodyText = await page.locator("body").innerText();
+console.log("---BODY TEXT---");
+console.log(bodyText.slice(0, 2000));
+await page.screenshot({ path: ".qa-scratch/cart-debug.png", fullPage: true });
+await browser.close();

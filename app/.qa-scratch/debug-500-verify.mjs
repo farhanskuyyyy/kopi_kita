@@ -1,0 +1,12 @@
+import { chromium } from "playwright";
+const browser = await chromium.launch();
+const page = await browser.newPage();
+await page.goto("http://localhost:4173/menu", { waitUntil: "networkidle" });
+await page.waitForTimeout(500);
+await page.evaluate(() => window.__mockScenarios.forceServerError(true));
+await page.locator("a[href='/menu/espresso']").first().click();
+await page.waitForTimeout(2000);
+const bannerVisible = await page.locator("[class*='destructive']").count();
+console.log("bannerVisible count:", bannerVisible);
+console.log(await page.locator("body").innerText());
+await browser.close();

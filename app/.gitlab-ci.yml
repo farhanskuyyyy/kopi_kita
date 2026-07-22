@@ -1,0 +1,102 @@
+# Kopi Kita (ecatalog-coffeeshop) — frontend-only static SPA pipeline.
+#
+# Ownership note: this file is a devops (Stage 10 packaging) artifact — it
+# defines the pipeline shape only. Triggering/monitoring a run and treating
+# "pipeline green" as a release gate is release-manager's responsibility
+# (see FACTORY-RULES.md Release Management Rules). Running this pipeline
+# also requires a registered GitLab Runner with the docker/shell executor;
+# provisioning that runner is a separate, explicitly-approved devops action
+# (see CLAUDE.md Runner Provisioning Approval Rule) and is NOT done by this
+# file or by writing it.
+
+stages:
+  - install
+  - lint
+  - build
+  - container
+  - deploy
+
+variables:
+  NODE_IMAGE: "node:20.18-alpine3.20"
+  npm_config_cache: "$CI_PROJECT_DIR/.npm-cache"
+
+default:
+  image: $NODE_IMAGE
+  cache:
+    key:
+      files:
+        - package-lock.json
+    paths:
+      - .npm-cache/
+      - node_modules/
+
+install:
+  stage: install
+  script:
+    - npm ci || npm install
+  artifacts:
+    paths:
+      - node_modules/
+    expire_in: 1 hour
+
+# Project has no ESLint config yet — "lint" gate is TypeScript's own strict
+# project-wide check (tsc --noEmit == `npm run lint`), which is what tsc -b
+# also runs as part of `npm run build`. Wired as its own stage so a type
+# error fails fast, before spending time on the build stage.
+lint:
+  stage: lint
+  needs: ["install"]
+  script:
+    - npm run lint
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+
+build:
+  stage: build
+  needs: ["install", "lint"]
+  script:
+    - npm run build
+  artifacts:
+    paths:
+      - dist/
+    expire_in: 1 week
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+
+# Optional portable-artifact path (Docker/nginx alternative to Vercel).
+# Manual because most runs only need the Vercel static deploy below.
+container:
+  stage: container
+  image: docker:27
+  services:
+    - docker:27-dind
+  needs: ["build"]
+  script:
+    - docker build -t "$CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA" .
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      when: manual
+  allow_failure: true
+
+# Placeholder deploy job. Does NOT embed any real token — $VERCEL_TOKEN,
+# $VERCEL_ORG_ID and $VERCEL_PROJECT_ID must be configured as masked/
+# protected CI/CD variables in the GitLab project settings. Manual gate:
+# release-manager triggers this job after human production-deploy approval
+# (see CLAUDE.md Deployment Approval Rule) — it is never auto-triggered on
+# push.
+deploy:
+  stage: deploy
+  needs: ["build"]
+  script:
+    - npm install --no-save vercel
+    - npx vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+    - npx vercel build --prod --token="$VERCEL_TOKEN"
+    - npx vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      when: manual
+  environment:
+    name: production
+    url: https://kopi-kita.vercel.app

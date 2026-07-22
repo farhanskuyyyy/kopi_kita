@@ -1,0 +1,18 @@
+import { chromium } from "playwright";
+const browser = await chromium.launch();
+const page = await browser.newPage();
+await page.goto("http://localhost:4173/admin/login", { waitUntil: "networkidle" });
+await page.fill("#username", "staff.fulfillment");
+await page.fill("#password", "Staff123!");
+await page.locator("button[type=submit]").click();
+await page.waitForURL("**/admin", { timeout: 6000 });
+await page.locator("a[href='/admin/orders']").first().click();
+await page.waitForURL("**/admin/orders");
+await page.waitForTimeout(700);
+console.log("--- order list body ---");
+console.log(await page.locator("body").innerText());
+const rows = page.locator("table tbody tr");
+console.log("row count:", await rows.count());
+const html = await page.locator("table tbody").innerHTML();
+console.log(html.slice(0, 1500));
+await browser.close();
