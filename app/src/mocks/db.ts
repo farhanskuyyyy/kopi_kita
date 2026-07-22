@@ -124,8 +124,8 @@ function sugarGroup(prefix: string): CustomizationGroup {
   };
 }
 
-function img(seed: string): string {
-  return `https://picsum.photos/seed/${seed}/640/480`;
+function img(_seed: string): string {
+  return "/images/kopi.jpeg";
 }
 
 // ---------------------------------------------------------------------------
@@ -404,7 +404,7 @@ function buildStoreInfo(): StoreInfo {
     ],
     address: "Jl. Braga No. 45, Bandung, Jawa Barat 40111",
     phone: "+62221234567",
-    mapPlaceholderUrl: "https://picsum.photos/seed/store-map/640/360",
+    mapPlaceholderUrl: "/images/kopi.jpeg",
   };
 }
 
